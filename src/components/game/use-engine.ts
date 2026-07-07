@@ -16,7 +16,6 @@ export function useEngine() {
   const setObjective = useGameStore((s) => s.setObjective);
   const setProgress = useGameStore((s) => s.setProgress);
   const complete = useGameStore((s) => s.complete);
-  const startedAtPerf = useGameStore((s) => s.startedAtPerf);
 
   const rng = useMemo(() => mulberry32(seed), [seed]);
   const paused = phase === "paused";
@@ -25,9 +24,12 @@ export function useEngine() {
     pausedRef.current = paused;
   }, [paused]);
 
+  // Stable identity, always reads the current clock epoch: resume() shifts
+  // startedAtPerf forward by the pause duration, and closures created before
+  // a pause must not keep stamping against the old epoch (negative RTs).
   const now = useCallback(
-    () => Math.round(performance.now() - startedAtPerf),
-    [startedAtPerf]
+    () => Math.round(performance.now() - useGameStore.getState().startedAtPerf),
+    []
   );
 
   const recordTrial = useCallback(
@@ -41,6 +43,7 @@ export function useEngine() {
   );
 
   return {
+    seed,
     rng,
     paused,
     pausedRef,

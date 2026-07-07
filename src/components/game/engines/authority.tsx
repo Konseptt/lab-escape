@@ -33,7 +33,7 @@ const CHECKPOINTS: Checkpoint[] = [
  * participant, and the room records where you comply, question, and refuse.
  */
 export function AuthorityEngine({ config }: { config: Record<string, unknown> }) {
-  const { record, setObjective, setProgress, complete } = useEngine();
+  const { now, record, setObjective, setProgress, complete } = useEngine();
   void config;
 
   const [phase, setPhase] = useState<Phase>("ready");
@@ -51,8 +51,8 @@ export function AuthorityEngine({ config }: { config: Record<string, unknown> })
     setProgress(level / CHECKPOINTS.length);
   }, [level, setProgress]);
   useEffect(() => {
-    if (phase === "checkpoint") shownAtRef.current = performance.now();
-  }, [phase, level]);
+    if (phase === "checkpoint") shownAtRef.current = now();
+  }, [phase, level, now]);
 
   const act = useCallback(
     (action: "comply" | "question" | "refuse") => {
@@ -62,7 +62,7 @@ export function AuthorityEngine({ config }: { config: Record<string, unknown> })
         expected: null,
         response: action,
         correct: null,
-        rtMs: Math.round(performance.now() - shownAtRef.current),
+        rtMs: now() - shownAtRef.current,
       });
       if (action === "question") {
         questionsRef.current += 1;
@@ -81,7 +81,7 @@ export function AuthorityEngine({ config }: { config: Record<string, unknown> })
         setLevel((l) => l + 1);
       }
     },
-    [record, checkpoint, level]
+    [record, checkpoint, now, level]
   );
 
   const finish = useCallback(() => {

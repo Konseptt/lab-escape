@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { Prisma } from "@/generated/client";
 import { db } from "@/lib/db";
 import { signIn, signOut } from "@/lib/auth";
 import { GUEST_COOKIE } from "@/lib/session";
@@ -54,18 +55,19 @@ export async function signup(
   const { name, email, password } = parsed.data;
 
   try {
-    const existing = await db.user.findUnique({ where: { email } });
-    if (existing) return { error: "An account with this email already exists." };
-
     const passwordHash = await bcrypt.hash(password, 12);
+    // Create directly; the unique constraint on email is the race-free check.
     await db.user.create({
       data: { name, email, passwordHash, settings: { create: {} } },
     });
-  } catch {
-    return {
-      error:
-        "Database unavailable. Run `docker compose up -d` or continue as a guest.",
-    };
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2002"
+    ) {
+      return { error: "An account with this email already exists." };
+    }
+    return { error: "Service temporarily unavailable. Try again or continue as a guest." };
   }
 
   try {
@@ -100,6 +102,7 @@ export async function continueAsGuest() {
   const jar = await cookies();
   jar.set(GUEST_COOKIE, crypto.randomUUID(), {
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     maxAge: 60 * 60 * 24 * 30,
     path: "/",
@@ -133,6 +136,12 @@ export async function requestPasswordReset(
     const user = await db.user.findUnique({ where: { email } });
     if (user) {
       const token = crypto.randomUUID();
+      // TODO: no consuming /reset route exists yet.
+      // Cap outstanding tokens at one per email so anonymous re-requests
+      // can't flood the table.
+      await db.verificationToken.deleteMany({
+        where: { identifier: `reset:${email}` },
+      });
       await db.verificationToken.create({
         data: {
           identifier: `reset:${email}`,

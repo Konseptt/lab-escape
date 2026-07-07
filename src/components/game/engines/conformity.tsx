@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useEngine, usePausableTimeout } from "../use-engine";
 import { Stage, Interstitial } from "../primitives";
+import { mulberry32 } from "@/lib/game/rng";
 import { Button } from "@/components/ui/button";
 
 type Phase = "ready" | "panel" | "respond" | "done";
@@ -24,21 +25,24 @@ const PANEL_NAMES = ["P-07", "P-12", "P-19", "P-23", "P-31"];
  * wrong; late in the block one panelist dissents.
  */
 export function ConformityEngine({ config }: { config: Record<string, unknown> }) {
-  const { rng, record, setObjective, setProgress, complete } = useEngine();
+  const { seed, now, record, setObjective, setProgress, complete } = useEngine();
   const after = usePausableTimeout();
 
   const nTrials = (config.trials as number) ?? 14;
   const allyTrial = (config.allyTrial as number) ?? nTrials - 4;
 
   const trials = useMemo<LineTrial[]>(() => {
+    // Fresh generator per memo run: render-phase draws stay deterministic
+    // under StrictMode double-invocation.
+    const r = mulberry32(seed);
     // Critical trials at fixed positions (after 2 honest warmups), like Asch.
     const criticalSet = new Set([2, 4, 5, 7, 9, 11, 12, 13].slice(0, 8));
     return Array.from({ length: nTrials }, (_, i) => {
-      const reference = 90 + Math.floor(rng() * 100);
-      const correctIdx = Math.floor(rng() * 3);
+      const reference = 90 + Math.floor(r() * 100);
+      const correctIdx = Math.floor(r() * 3);
       const options = [0, 0, 0].map((_, j) => {
         if (j === correctIdx) return reference;
-        const delta = (18 + Math.floor(rng() * 26)) * (rng() > 0.5 ? 1 : -1);
+        const delta = (18 + Math.floor(r() * 26)) * (r() > 0.5 ? 1 : -1);
         return Math.max(50, reference + delta);
       }) as [number, number, number];
       return {
@@ -49,7 +53,7 @@ export function ConformityEngine({ config }: { config: Record<string, unknown> }
         allyDissent: criticalSet.has(i) && i >= allyTrial,
       };
     });
-  }, [rng, nTrials, allyTrial]);
+  }, [seed, nTrials, allyTrial]);
 
   const [phase, setPhase] = useState<Phase>("ready");
   const [idx, setIdx] = useState(0);
@@ -59,19 +63,21 @@ export function ConformityEngine({ config }: { config: Record<string, unknown> }
   const criticalSeenRef = useRef(0);
   const trial = trials[idx];
 
-  // Panel answer: wrong-but-unanimous on critical trials.
+  // Panel answer: wrong-but-unanimous on critical trials. Derived
+  // deterministically from seed + trial index so re-renders never advance
+  // shared RNG state.
   const panelAnswers = useMemo(() => {
     if (!trial) return [];
+    const r = mulberry32(seed ^ (idx + 1));
     const wrong = trial.critical
-      ? (trial.correct + 1 + Math.floor(rng() * 2)) % 3
+      ? (trial.correct + 1 + Math.floor(r() * 2)) % 3
       : trial.correct;
     return PANEL_NAMES.map((name, i) => ({
       name,
       answer:
         trial.allyDissent && i === PANEL_NAMES.length - 1 ? trial.correct : wrong,
     }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trial]);
+  }, [trial, seed, idx]);
 
   useEffect(() => {
     setObjective("Which line matches the reference?");
@@ -85,7 +91,7 @@ export function ConformityEngine({ config }: { config: Record<string, unknown> }
     setRevealed(0);
     const step = (i: number) => {
       if (i >= PANEL_NAMES.length) {
-        shownAtRef.current = performance.now();
+        shownAtRef.current = now();
         setPhase("respond");
         return;
       }
@@ -93,7 +99,7 @@ export function ConformityEngine({ config }: { config: Record<string, unknown> }
       after(700, () => step(i + 1));
     };
     after(500, () => step(0));
-  }, [after]);
+  }, [after, now]);
 
   const respond = useCallback(
     (choice: number) => {
@@ -114,7 +120,7 @@ export function ConformityEngine({ config }: { config: Record<string, unknown> }
         expected: String(trial.correct),
         response: String(choice),
         correct: choice === trial.correct,
-        rtMs: Math.round(performance.now() - shownAtRef.current),
+        rtMs: now() - shownAtRef.current,
       });
       if (idx + 1 >= nTrials) {
         setPhase("done");
@@ -130,7 +136,7 @@ export function ConformityEngine({ config }: { config: Record<string, unknown> }
         setPhase("ready");
       }
     },
-    [phase, trial, panelAnswers, record, idx, nTrials, complete]
+    [phase, trial, panelAnswers, record, now, idx, nTrials, complete]
   );
 
   if (phase === "ready") {

@@ -4,14 +4,17 @@ import Link from "next/link";
 import { useState } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useHydrated } from "@/components/use-hydrated";
 
 const KEY = "lab-escape:guest-notice-dismissed";
 
 export function GuestNotice({ isGuest }: { isGuest: boolean }) {
-  const [hidden, setHidden] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem(KEY) === "1";
-  });
+  // Dismissal lives in localStorage; render nothing until hydration so SSR
+  // markup and the first client render agree.
+  const hydrated = useHydrated();
+  const [dismissed, setDismissed] = useState(false);
+  const hidden =
+    !hydrated || dismissed || localStorage.getItem(KEY) === "1";
 
   if (!isGuest || hidden) return null;
 
@@ -32,7 +35,7 @@ export function GuestNotice({ isGuest }: { isGuest: boolean }) {
           type="button"
           onClick={() => {
             localStorage.setItem(KEY, "1");
-            setHidden(true);
+            setDismissed(true);
           }}
           className="flex size-8 items-center justify-center text-faint hover:text-muted-foreground"
           aria-label="Dismiss"

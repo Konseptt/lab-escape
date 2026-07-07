@@ -10,6 +10,7 @@ import {
 } from "@/lib/ux/journey";
 import { dismissTrainingChecklist, getUxStore } from "@/lib/ux/progress";
 import { useUxFlags } from "@/components/ux/use-ux-flags";
+import { useHydrated } from "@/components/use-hydrated";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
@@ -17,9 +18,12 @@ import { cn } from "@/lib/utils";
 export function TrainingChecklist() {
   const sessions = useHistory();
   const flags = useUxFlags();
-  const [dismissed, setDismissed] = useState(
-    () => getUxStore().checklistDismissed
-  );
+  // Dismissal lives in localStorage; render nothing until hydration so SSR
+  // markup and the first client render agree.
+  const hydrated = useHydrated();
+  const [justDismissed, setJustDismissed] = useState(false);
+  const dismissed =
+    !hydrated || justDismissed || getUxStore().checklistDismissed;
 
   const items = useMemo(
     () => buildTrainingChecklist(sessions, flags),
@@ -49,7 +53,7 @@ export function TrainingChecklist() {
           type="button"
           onClick={() => {
             dismissTrainingChecklist();
-            setDismissed(true);
+            setJustDismissed(true);
           }}
           className="text-faint hover:text-muted-foreground"
           aria-label="Dismiss checklist"

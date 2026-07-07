@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEngine, usePausableTimeout } from "../use-engine";
 import { Stage, Interstitial } from "../primitives";
-import { shuffle } from "@/lib/game/rng";
+import { shuffle, mulberry32 } from "@/lib/game/rng";
 import { Button } from "@/components/ui/button";
 
 interface DrmList {
@@ -27,20 +27,23 @@ type Phase = "ready" | "study" | "distractor" | "test" | "done";
 
 /** DRM false-memory paradigm: study associate lists, then old/new recognition. */
 export function DrmEngine({ config }: { config: Record<string, unknown> }) {
-  const { rng, record, setObjective, setProgress, complete } = useEngine();
+  const { seed, now, pausedRef, record, setObjective, setProgress, complete } = useEngine();
   const after = usePausableTimeout();
 
   const nLists = Math.min((config.lists as number) ?? 4, LISTS.length);
   const studyMs = (config.studyMs as number) ?? 1100;
 
-  const lists = useMemo(() => shuffle(rng, LISTS).slice(0, nLists), [rng, nLists]);
+  // Fresh local generators per memo run keep render-phase draws deterministic
+  // under StrictMode double-invocation.
+  const lists = useMemo(() => shuffle(mulberry32(seed), LISTS).slice(0, nLists), [seed, nLists]);
   const studied = useMemo(() => lists.flatMap((l) => l.words), [lists]);
   const testSet = useMemo(() => {
-    const oldItems = shuffle(rng, studied).slice(0, 12).map((w) => ({ w, type: "studied" as const }));
+    const r = mulberry32(seed ^ 0x9e3779b9);
+    const oldItems = shuffle(r, studied).slice(0, 12).map((w) => ({ w, type: "studied" as const }));
     const lures = lists.map((l) => ({ w: l.lure, type: "lure" as const }));
-    const foils = shuffle(rng, UNRELATED).slice(0, 8).map((w) => ({ w, type: "foil" as const }));
-    return shuffle(rng, [...oldItems, ...lures, ...foils]);
-  }, [rng, studied, lists]);
+    const foils = shuffle(r, UNRELATED).slice(0, 8).map((w) => ({ w, type: "foil" as const }));
+    return shuffle(r, [...oldItems, ...lures, ...foils]);
+  }, [seed, studied, lists]);
 
   const [phase, setPhase] = useState<Phase>("ready");
   const [listIdx, setListIdx] = useState(0);
@@ -61,7 +64,16 @@ export function DrmEngine({ config }: { config: Record<string, unknown> }) {
 
   useEffect(() => {
     const total = nLists + testSet.length;
-    const done = phase === "test" ? nLists + testIdx : phase === "study" ? listIdx : 0;
+    const done =
+      phase === "test"
+        ? nLists + testIdx
+        : phase === "study"
+          ? listIdx
+          : phase === "distractor"
+            ? nLists
+            : phase === "done"
+              ? total
+              : 0;
     setProgress(done / total);
   }, [phase, listIdx, testIdx, nLists, testSet.length, setProgress]);
 
@@ -90,6 +102,7 @@ export function DrmEngine({ config }: { config: Record<string, unknown> }) {
 
   const respond = useCallback(
     (saysOld: boolean) => {
+      if (pausedRef.current) return;
       const item = testSet[testIdx];
       const isOld = item.type === "studied";
       const correct = saysOld === isOld;
@@ -100,7 +113,7 @@ export function DrmEngine({ config }: { config: Record<string, unknown> }) {
         expected: isOld ? "old" : "new",
         response: saysOld ? "old" : "new",
         correct,
-        rtMs: Math.round(performance.now() - shownAtRef.current),
+        rtMs: now() - shownAtRef.current,
       });
       if (testIdx + 1 >= testSet.length) {
         setPhase("done");
@@ -112,16 +125,16 @@ export function DrmEngine({ config }: { config: Record<string, unknown> }) {
           },
         ]);
       } else {
-        shownAtRef.current = performance.now();
+        shownAtRef.current = now();
         setTestIdx((i) => i + 1);
       }
     },
-    [testSet, testIdx, record, nLists, complete]
+    [testSet, testIdx, record, now, pausedRef, nLists, complete]
   );
 
   useEffect(() => {
-    if (phase === "test") shownAtRef.current = performance.now();
-  }, [phase]);
+    if (phase === "test") shownAtRef.current = now();
+  }, [phase, now]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

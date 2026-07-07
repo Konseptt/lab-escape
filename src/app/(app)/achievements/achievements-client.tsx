@@ -77,10 +77,23 @@ function useEarned(): Set<string> {
     if (attentionRooms.every((r) => completed.has(r.slug))) earned.add("wing-attention");
     if (ROOMS.every((r) => completed.has(r.slug))) earned.add("all-rooms");
 
-    const days = new Set(
-      sessions.map((s) => new Date(s.startedAtISO).toDateString())
-    );
-    if (days.size >= 7) earned.add("week-streak");
+    const dayEpochs = Array.from(
+      new Set(
+        sessions.map((s) => {
+          const d = new Date(s.startedAtISO);
+          return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+        })
+      )
+    ).sort((a, b) => a - b);
+    let run = dayEpochs.length ? 1 : 0;
+    let bestRun = run;
+    for (let i = 1; i < dayEpochs.length; i++) {
+      // Round: DST shifts make local midnights 23-25h apart.
+      const gapDays = Math.round((dayEpochs[i] - dayEpochs[i - 1]) / 86_400_000);
+      run = gapDays === 1 ? run + 1 : 1;
+      if (run > bestRun) bestRun = run;
+    }
+    if (bestRun >= 7) earned.add("week-streak");
 
     return earned;
   }, [sessions]);

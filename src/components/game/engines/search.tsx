@@ -27,7 +27,7 @@ type Phase = "ready" | "tracking" | "count" | "probe" | "done";
  */
 export function SearchEngine({ config }: { config: Record<string, unknown> }) {
   void config; // engine parameters are fixed for this paradigm build
-  const { rng, record, setObjective, setProgress, complete } = useEngine();
+  const { rng, now, record, setObjective, setProgress, complete } = useEngine();
   const pausedRef = useRef(false);
   const phase = useGameStore((s) => s.phase);
   useEffect(() => {
@@ -51,6 +51,7 @@ export function SearchEngine({ config }: { config: Record<string, unknown> }) {
   const setSize = useMemo(() => [8, 10, 12][trialN % 3], [trialN]);
 
   const [movers, setMovers] = useState<Mover[]>([]);
+  const moversRef = useRef<Mover[]>([]);
   const [intruder, setIntruder] = useState<{ x: number; y: number } | null>(null);
   const rafRef = useRef(0);
 
@@ -75,7 +76,8 @@ export function SearchEngine({ config }: { config: Record<string, unknown> }) {
       };
     });
     actualBouncesRef.current = 0;
-    setMovers(shuffle(rng, init));
+    moversRef.current = shuffle(rng, init);
+    setMovers(moversRef.current);
     setIntruder(null);
     setBounceGuess(null);
     setStage("tracking");
@@ -92,24 +94,26 @@ export function SearchEngine({ config }: { config: Record<string, unknown> }) {
       last = nowTs;
       if (!pausedRef.current) {
         elapsed += dt * 1000;
-        setMovers((prev) =>
-          prev.map((m) => {
-            let { x, y, vx, vy } = m;
-            x += vx * dt;
-            y += vy * dt;
-            if (x < 14 || x > W - 14) {
-              vx = -vx;
-              x = Math.max(14, Math.min(W - 14, x));
-              if (m.target) actualBouncesRef.current += 1;
-            }
-            if (y < 14 || y > H - 14) {
-              vy = -vy;
-              y = Math.max(14, Math.min(H - 14, y));
-              if (m.target) actualBouncesRef.current += 1;
-            }
-            return { ...m, x, y, vx, vy };
-          })
-        );
+        // Simulate outside the state updater so bounce counting is not
+        // double-run under StrictMode.
+        const next = moversRef.current.map((m) => {
+          let { x, y, vx, vy } = m;
+          x += vx * dt;
+          y += vy * dt;
+          if (x < 14 || x > W - 14) {
+            vx = -vx;
+            x = Math.max(14, Math.min(W - 14, x));
+            if (m.target) actualBouncesRef.current += 1;
+          }
+          if (y < 14 || y > H - 14) {
+            vy = -vy;
+            y = Math.max(14, Math.min(H - 14, y));
+            if (m.target) actualBouncesRef.current += 1;
+          }
+          return { ...m, x, y, vx, vy };
+        });
+        moversRef.current = next;
+        setMovers(next);
         if (isCritical && elapsed > duration * 0.35 && elapsed < duration * 0.8) {
           intruderX += 110 * dt;
           setIntruder({ x: intruderX, y: intruderY });
@@ -120,12 +124,12 @@ export function SearchEngine({ config }: { config: Record<string, unknown> }) {
       if (elapsed < duration) {
         rafRef.current = requestAnimationFrame(tick);
       } else {
-        countStartRef.current = performance.now();
+        countStartRef.current = now();
         setStage("count");
       }
     };
     rafRef.current = requestAnimationFrame(tick);
-  }, [rng, setSize, isCritical]);
+  }, [rng, now, setSize, isCritical]);
 
   useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
 
@@ -156,7 +160,7 @@ export function SearchEngine({ config }: { config: Record<string, unknown> }) {
         expected: String(actual),
         response: String(guess),
         correct: err <= 1,
-        rtMs: Math.round(performance.now() - countStartRef.current),
+        rtMs: now() - countStartRef.current,
       });
       if (isCritical) {
         setStage("probe");
@@ -167,7 +171,7 @@ export function SearchEngine({ config }: { config: Record<string, unknown> }) {
         setStage("ready");
       }
     },
-    [record, setSize, isCritical, trialN, finish]
+    [record, now, setSize, isCritical, trialN, finish]
   );
 
   const answerProbe = useCallback(
@@ -216,7 +220,7 @@ export function SearchEngine({ config }: { config: Record<string, unknown> }) {
           title="How many bounces?"
           action={
             <div className="grid grid-cols-5 gap-2">
-              {Array.from({ length: 15 }, (_, i) => i + 2).map((n) => (
+              {Array.from({ length: 25 }, (_, i) => i + 8).map((n) => (
                 <button
                   key={n}
                   type="button"

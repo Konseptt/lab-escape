@@ -15,7 +15,7 @@ type Phase = "ready" | "flicker" | "done";
  * a blank. Click the cell that changes. Alternation count = search cost.
  */
 export function FlickerEngine({ config }: { config: Record<string, unknown> }) {
-  const { rng, record, setObjective, setProgress, complete } = useEngine();
+  const { rng, now, record, setObjective, setProgress, complete } = useEngine();
   const after = usePausableTimeout();
 
   const nTrials = (config.trials as number) ?? 12;
@@ -56,7 +56,7 @@ export function FlickerEngine({ config }: { config: Record<string, unknown> }) {
     setChangedIdx(idx);
     setAltGlyph(alt);
     setAlternations(0);
-    startRef.current = performance.now();
+    startRef.current = now();
     runningRef.current = true;
     setPhase("flicker");
     setShowAlt(false);
@@ -76,7 +76,7 @@ export function FlickerEngine({ config }: { config: Record<string, unknown> }) {
       });
     };
     cycle();
-  }, [gridSize, rng, after, flickerMs, blankMs]);
+  }, [gridSize, rng, now, after, flickerMs, blankMs]);
 
   const clickCell = useCallback(
     (i: number) => {
@@ -93,7 +93,7 @@ export function FlickerEngine({ config }: { config: Record<string, unknown> }) {
         expected: String(changedIdx),
         response: String(i),
         correct,
-        rtMs: Math.round(performance.now() - startRef.current),
+        rtMs: now() - startRef.current,
       });
       if (trialN + 1 >= nTrials) {
         setPhase("done");
@@ -109,7 +109,7 @@ export function FlickerEngine({ config }: { config: Record<string, unknown> }) {
         setPhase("ready");
       }
     },
-    [phase, record, trialN, gridSize, nTrials, complete, changedIdx, alternations]
+    [phase, record, trialN, gridSize, now, nTrials, complete, changedIdx, alternations]
   );
 
   if (phase === "ready") {

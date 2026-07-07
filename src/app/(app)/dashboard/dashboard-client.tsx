@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { ArrowRight, FlaskConical } from "lucide-react";
 import { useHistory } from "@/components/use-history";
 import { ROOMS, getRoom } from "@/lib/content/rooms";
@@ -18,6 +18,7 @@ import { buildTrainingPlan } from "@/lib/training/plan";
 import { NextActionBar } from "@/components/ux/next-action-bar";
 import { useNextAction } from "@/components/ux/use-next-action";
 import { TrainingChecklist } from "@/components/ux/training-checklist";
+import { useHydrated } from "@/components/use-hydrated";
 import { GuestNotice } from "@/components/ux/guest-notice";
 
 const TRAINING_DRILLS = [
@@ -40,8 +41,16 @@ const TRAINING_DRILLS = [
 
 export function DashboardClient({ name, isGuest = true }: { name: string; isGuest?: boolean }) {
   const sessions = useHistory();
-  // Daily challenge: deterministic pick by date, fixed at mount.
-  const [dayIdx] = useState(() => Math.floor(Date.now() / 86_400_000) % ROOMS.length);
+  // Daily challenge: deterministic pick by local date, resolved after
+  // hydration so SSR markup and the first client render agree.
+  const hydrated = useHydrated();
+  const dayIdx = useMemo(() => {
+    if (!hydrated) return 0;
+    const now = new Date();
+    return Math.floor(
+      (now.getTime() - now.getTimezoneOffset() * 60_000) / 86_400_000
+    );
+  }, [hydrated]);
 
   const { completed, totalMinutes, meanAccuracy, xp, recentScores, suggestion, daily } =
     useMemo(() => {
@@ -63,7 +72,7 @@ export function DashboardClient({ name, isGuest = true }: { name: string; isGues
         xp,
         recentScores: sessions.slice(0, 12).map((s) => s.score).reverse(),
         suggestion: next,
-        daily: ROOMS[dayIdx],
+        daily: unlocked[dayIdx % unlocked.length],
       };
     }, [sessions, dayIdx]);
 

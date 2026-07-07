@@ -8,6 +8,11 @@ import { useSettingsStore } from "@/stores/settings-store";
 
 function MotionPreference() {
   const reducedMotion = useSettingsStore((s) => s.reducedMotion);
+  // Persistence skips automatic hydration (SSR mismatch); load saved
+  // settings once at the app root so every page sees them.
+  useEffect(() => {
+    void useSettingsStore.persist.rehydrate();
+  }, []);
   useEffect(() => {
     document.documentElement.dataset.motion = reducedMotion ? "reduced" : "full";
   }, [reducedMotion]);

@@ -35,6 +35,9 @@ export const useSettingsStore = create<SettingsState>()(
       language: "en",
       set: (key, value) => set({ [key]: value }),
     }),
-    { name: "lab-escape:settings" }
+    // skipHydration: the SSR render and the first client render both use the
+    // defaults; consumers call useSettingsStore.persist.rehydrate() in a
+    // mount effect to load the persisted values.
+    { name: "lab-escape:settings", skipHydration: true }
   )
 );

@@ -40,7 +40,7 @@ export function buildSessionDebrief(
     pattern = "Accuracy is strong. Push for faster correct responses without trading errors.";
   }
 
-  const summary = `${accPct}% accuracy, ${session.meanRtMs}ms mean RT on correct trials. ${room.paradigm} in ${room.code}.`;
+  const summary = `${accPct}% accuracy, ${Math.round(session.meanRtMs)}ms mean RT on correct trials. ${room.paradigm} in ${room.code}.`;
 
   const drills: string[] = [];
   if (priorInRoom === 0) {

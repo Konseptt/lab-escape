@@ -50,7 +50,11 @@ export function learningCurve(trials: TrialRecord[], buckets = 5) {
   if (scored.length < buckets) return [];
   const size = Math.floor(scored.length / buckets);
   return Array.from({ length: buckets }, (_, i) => {
-    const slice = scored.slice(i * size, (i + 1) * size);
+    // Last bucket extends to the end so trailing trials are never dropped.
+    const slice =
+      i === buckets - 1
+        ? scored.slice(i * size)
+        : scored.slice(i * size, (i + 1) * size);
     return {
       bucket: i + 1,
       accuracy: slice.filter((t) => t.correct).length / slice.length,

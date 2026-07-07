@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect } from "react";
 import { toast } from "sonner";
 import { logout } from "@/app/actions/auth-actions";
 import { useSettingsStore, type SettingsState } from "@/stores/settings-store";
+import { invalidateHistory } from "@/components/use-history";
 import { PageHeader } from "@/components/page-header";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -63,6 +65,12 @@ const SECTIONS: { heading: string; note?: string; rows: Row[] }[] = [
 
 export function SettingsClient() {
   const settings = useSettingsStore();
+
+  // Persistence skips automatic hydration (SSR markup must match defaults);
+  // load the saved settings after mount.
+  useEffect(() => {
+    void useSettingsStore.persist.rehydrate();
+  }, []);
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10 lg:px-10">
@@ -173,6 +181,7 @@ export function SettingsClient() {
               variant="destructive"
               onClick={() => {
                 localStorage.removeItem("lab-escape:sessions");
+                invalidateHistory();
                 toast.success("Local session data deleted", {
                   description: "Server-side deletion requests are processed within 30 days.",
                 });

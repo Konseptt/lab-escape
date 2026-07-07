@@ -13,7 +13,7 @@ type Phase = "ready" | "choosing" | "feedback" | "done";
  * Measures learning rate and exploration policy.
  */
 export function BanditEngine({ config }: { config: Record<string, unknown> }) {
-  const { rng, record, setObjective, setProgress, complete } = useEngine();
+  const { rng, now, pausedRef, record, setObjective, setProgress, complete } = useEngine();
   const after = usePausableTimeout();
 
   const nTrials = (config.trials as number) ?? 60;
@@ -46,12 +46,12 @@ export function BanditEngine({ config }: { config: Record<string, unknown> }) {
     setProgress(trialN / nTrials);
   }, [trialN, nTrials, setProgress]);
   useEffect(() => {
-    if (phase === "choosing") shownAtRef.current = performance.now();
-  }, [phase, trialN]);
+    if (phase === "choosing") shownAtRef.current = now();
+  }, [phase, trialN, now]);
 
   const choose = useCallback(
     (arm: number) => {
-      if (phase !== "choosing") return;
+      if (phase !== "choosing" || pausedRef.current) return;
       const p = probs(trialN);
       const win = rng() < p[arm];
       const bestArm = p.indexOf(Math.max(...p));
@@ -64,7 +64,7 @@ export function BanditEngine({ config }: { config: Record<string, unknown> }) {
         expected: String(bestArm),
         response: String(arm),
         correct: arm === bestArm,
-        rtMs: Math.round(performance.now() - shownAtRef.current),
+        rtMs: now() - shownAtRef.current,
       });
       setLastOutcome({ arm, win });
       if (win) setEnergy((e) => e + 1);
@@ -97,7 +97,7 @@ export function BanditEngine({ config }: { config: Record<string, unknown> }) {
         }
       });
     },
-    [phase, probs, trialN, rng, reversalAt, record, after, nTrials, complete, energy]
+    [phase, probs, trialN, rng, now, pausedRef, reversalAt, record, after, nTrials, complete, energy]
   );
 
   useEffect(() => {

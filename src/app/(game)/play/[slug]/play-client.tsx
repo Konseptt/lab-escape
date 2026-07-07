@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import type { Difficulty, RoomContent } from "@/lib/content/types";
-import { getRoomOverride } from "@/lib/content/overrides";
+import { getRoomOverride, type RoomOverride } from "@/lib/content/overrides";
 import { useGameStore } from "@/stores/game-store";
+import { useSettingsStore } from "@/stores/settings-store";
 import { GameHud } from "@/components/game/hud";
+import { useHydrated } from "@/components/use-hydrated";
 import { Button } from "@/components/ui/button";
 import { DifficultyMeter } from "@/components/room-card";
 import { SubjectPathway } from "@/components/subject-pathway";
@@ -52,8 +54,16 @@ export function PlayClient({ room }: { room: RoomContent }) {
   const router = useRouter();
   const { phase, roomSlug, start, begin, result } = useGameStore();
 
+  // Overrides live in localStorage; read after hydration so SSR markup and
+  // the first client render agree.
+  const hydrated = useHydrated();
+  const override = useMemo<RoomOverride | undefined>(
+    () => (hydrated ? getRoomOverride(room.slug) : undefined),
+    [hydrated, room.slug]
+  );
+
   const active = useMemo(() => {
-    const o = getRoomOverride(room.slug);
+    const o = override;
     if (!o) return room;
     return {
       ...room,
@@ -62,23 +72,38 @@ export function PlayClient({ room }: { room: RoomContent }) {
       difficulty: (o.difficulty as Difficulty | undefined) ?? room.difficulty,
       config: { ...room.config, ...(o.config ?? {}) },
     };
-  }, [room]);
+  }, [room, override]);
 
-  // Initialize a fresh session when entering the room.
-  useEffect(() => {
-    if (roomSlug !== active.slug) start(active.slug);
-  }, [active.slug, roomSlug, start]);
+  // Any result id already in the store at mount belongs to a previous run;
+  // redirecting for it would bounce back to an old debrief.
+  const staleResultId = useRef(useGameStore.getState().result?.id ?? null);
 
-  // Hand off to results when the engine completes.
+  // Initialize a fresh session when entering the room, including re-entry
+  // after a completed or abandoned run left stale state in the store. The
+  // render below gates on `hydrated`, which flips in the same commit window,
+  // so stale store state is never shown.
   useEffect(() => {
-    if (phase === "complete" && result) {
+    const s = useGameStore.getState();
+    if (s.roomSlug !== room.slug || s.phase !== "briefing") start(room.slug);
+  }, [room.slug, start]);
+
+  // Settings persistence skips automatic hydration; load it once mounted so
+  // the HUD and engines see the participant's saved preferences.
+  useEffect(() => {
+    void useSettingsStore.persist.rehydrate();
+  }, []);
+
+  // Hand off to results when the engine completes, only for a session that
+  // finished after this mount.
+  useEffect(() => {
+    if (phase === "complete" && result && result.id !== staleResultId.current) {
       router.push(`/results/${result.id}`);
     }
   }, [phase, result, router]);
 
   const Engine = ENGINES[active.engine];
 
-  if (phase === "briefing" || roomSlug !== active.slug) {
+  if (!hydrated || phase === "briefing" || roomSlug !== active.slug) {
     return (
       <div className="relative flex min-h-dvh items-center justify-center px-6">
         <div className="absolute inset-0 dot-grid" aria-hidden="true" />

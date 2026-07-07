@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useEngine } from "../use-engine";
 import { Stage, Interstitial } from "../primitives";
-import { shuffle } from "@/lib/game/rng";
+import { shuffle, mulberry32 } from "@/lib/game/rng";
 import { Button } from "@/components/ui/button";
 
 interface Scenario {
@@ -86,7 +86,7 @@ type Phase = "ready" | "deciding" | "done";
  * in the sequence; susceptibility = risk choice flipping between frames.
  */
 export function FramingEngine({ config }: { config: Record<string, unknown> }) {
-  const { rng, record, setObjective, setProgress, complete } = useEngine();
+  const { seed, now, record, setObjective, setProgress, complete } = useEngine();
   void config;
 
   const scenarios = useMemo<Scenario[]>(() => {
@@ -105,8 +105,11 @@ export function FramingEngine({ config }: { config: Record<string, unknown> }) {
       gamble: p.loss[1],
     }));
     // Gains first (shuffled), then losses (shuffled) so pairs never neighbor.
-    return [...shuffle(rng, gains), ...shuffle(rng, losses)];
-  }, [rng]);
+    // Fresh generator per memo run: render-phase draws stay deterministic
+    // under StrictMode double-invocation.
+    const r = mulberry32(seed);
+    return [...shuffle(r, gains), ...shuffle(r, losses)];
+  }, [seed]);
 
   const [phase, setPhase] = useState<Phase>("ready");
   const [idx, setIdx] = useState(0);
@@ -121,8 +124,8 @@ export function FramingEngine({ config }: { config: Record<string, unknown> }) {
     setProgress(idx / scenarios.length);
   }, [idx, scenarios.length, setProgress]);
   useEffect(() => {
-    if (phase === "deciding") shownAtRef.current = performance.now();
-  }, [phase, idx]);
+    if (phase === "deciding") shownAtRef.current = now();
+  }, [phase, idx, now]);
 
   const choose = useCallback(
     (choice: "sure" | "gamble") => {
@@ -133,7 +136,7 @@ export function FramingEngine({ config }: { config: Record<string, unknown> }) {
         expected: null,
         response: choice,
         correct: null, // there is no "correct" answer, consistency is the measure
-        rtMs: Math.round(performance.now() - shownAtRef.current),
+        rtMs: now() - shownAtRef.current,
       });
       if (idx + 1 >= scenarios.length) {
         let flips = 0;
@@ -158,7 +161,7 @@ export function FramingEngine({ config }: { config: Record<string, unknown> }) {
         setIdx((i) => i + 1);
       }
     },
-    [scenario, record, idx, scenarios.length, complete]
+    [scenario, record, now, idx, scenarios.length, complete]
   );
 
   if (phase === "ready") {

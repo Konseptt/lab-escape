@@ -73,8 +73,9 @@ export function ResultsClient({ sessionId }: { sessionId: string }) {
   const errors = session.trials.filter(
     (t) => t.phase === "main" && t.correct === false
   ).length;
-  const minutes = Math.floor(session.durationMs / 60000);
-  const seconds = Math.round((session.durationMs % 60000) / 1000);
+  const totalS = Math.round(session.durationMs / 1000);
+  const minutes = Math.floor(totalS / 60);
+  const seconds = totalS % 60;
   const { priorInRoom, bestScoreInRoom, streakDays } = trainingStats(sessions);
   const roomPrior = priorInRoom(session.roomSlug);
   const roomBest = bestScoreInRoom(session.roomSlug);

@@ -8,7 +8,9 @@ const CSV_HEADER = [
 ].join(",");
 
 function csvEscape(v: unknown): string {
-  const s = v === null || v === undefined ? "" : String(v);
+  let s = v === null || v === undefined ? "" : String(v);
+  // Neutralize spreadsheet formula injection (=, +, -, @, tab, CR).
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
@@ -17,6 +19,7 @@ function csvEscape(v: unknown): string {
  * (or all sessions for ADMIN/RESEARCHER). `?format=json|csv`.
  * Staff bulk exports are anonymized by default; pass `?identified=1` to include emails.
  * Personal exports include identity unless `?anonymize=1`.
+ * `shown_at_ms` is the trial onset as milliseconds since session start.
  */
 export async function GET(req: Request) {
   const viewer = await getViewer();
@@ -84,7 +87,7 @@ export async function GET(req: Request) {
             t.response,
             t.correct,
             t.rtMs,
-            "",
+            t.shownAt.getTime() - s.startedAt.getTime(),
           ]
             .map(csvEscape)
             .join(",")
@@ -99,7 +102,7 @@ export async function GET(req: Request) {
     });
   } catch {
     return NextResponse.json(
-      { error: "Database unavailable. Start it with `docker compose up -d`." },
+      { error: "Service temporarily unavailable." },
       { status: 503 }
     );
   }

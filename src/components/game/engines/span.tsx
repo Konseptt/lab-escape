@@ -18,7 +18,7 @@ type Phase = "ready" | "present" | "recall" | "done";
  * Staircase: correct recall lengthens the next sequence, an error shortens it.
  */
 export function SpanEngine({ config }: { config: Record<string, unknown> }) {
-  const { rng, now, record, setObjective, setProgress, complete } = useEngine();
+  const { rng, now, pausedRef, record, setObjective, setProgress, complete } = useEngine();
   const after = usePausableTimeout();
   const largeText = useSettingsStore((s) => s.largeText);
 
@@ -75,7 +75,7 @@ export function SpanEngine({ config }: { config: Record<string, unknown> }) {
   }, [length, rng, after, itemMs, isiMs, now]);
 
   const submit = useCallback(() => {
-    if (phase !== "recall" || doneRef.current) return;
+    if (phase !== "recall" || doneRef.current || pausedRef.current) return;
     const correct = entry.join("") === sequence.join("");
     if (correct) bestRef.current = Math.max(bestRef.current, sequence.length);
     record({
@@ -108,14 +108,14 @@ export function SpanEngine({ config }: { config: Record<string, unknown> }) {
       setPhase("ready");
     }
   }, [
-    phase, entry, sequence, record, trialN, now, startLength, maxLength,
-    length, totalTrials, complete,
+    phase, entry, sequence, record, trialN, now, pausedRef, startLength,
+    maxLength, length, totalTrials, complete,
   ]);
 
   // Keyboard: number keys 1-9 map to the symbol pad, backspace, enter.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (phase !== "recall") return;
+      if (phase !== "recall" || pausedRef.current) return;
       const n = Number(e.key);
       if (n >= 1 && n <= SYMBOLS.length && entry.length < sequence.length) {
         setEntry((prev) => [...prev, SYMBOLS[n - 1]]);
@@ -127,7 +127,7 @@ export function SpanEngine({ config }: { config: Record<string, unknown> }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [phase, entry.length, sequence.length, submit]);
+  }, [phase, entry.length, sequence.length, submit, pausedRef]);
 
   const hintsUsed = useGameStore((s) => s.hintsUsed);
   void hintsUsed;

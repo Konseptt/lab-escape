@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useEngine, usePausableTimeout } from "../use-engine";
 import { Stage, Fixation, ResponseKey } from "../primitives";
-import { shuffle, pick } from "@/lib/game/rng";
+import { shuffle, pick, mulberry32 } from "@/lib/game/rng";
 import { mean } from "@/lib/game/scoring";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useGameStore } from "@/stores/game-store";
@@ -34,7 +34,7 @@ interface StroopTrial {
  * (emotional words).
  */
 export function StroopEngine({ config }: { config: Record<string, unknown> }) {
-  const { rng, now, record, setObjective, setProgress, complete } = useEngine();
+  const { seed, rng, now, pausedRef, record, setObjective, setProgress, complete } = useEngine();
   const after = usePausableTimeout();
   const largeText = useSettingsStore((s) => s.largeText);
 
@@ -43,17 +43,20 @@ export function StroopEngine({ config }: { config: Record<string, unknown> }) {
   const nPractice = (config.practice as number) ?? 8;
 
   const trials = useMemo<StroopTrial[]>(() => {
+    // Fresh generator per memo run: render-phase draws stay deterministic
+    // under StrictMode double-invocation.
+    const r = mulberry32(seed);
     const make = (kind: TrialKind): Omit<StroopTrial, "phase"> => {
-      const ink = pick(rng, COLORS);
+      const ink = pick(r, COLORS);
       if (kind === "congruent") return { word: ink.name.toUpperCase(), ink, kind };
       if (kind === "incongruent") {
-        const other = pick(rng, COLORS.filter((c) => c.name !== ink.name));
+        const other = pick(r, COLORS.filter((c) => c.name !== ink.name));
         return { word: other.name.toUpperCase(), ink, kind };
       }
-      if (kind === "threat") return { word: pick(rng, THREAT_WORDS).toUpperCase(), ink, kind };
-      if (kind === "positive") return { word: pick(rng, POSITIVE_WORDS).toUpperCase(), ink, kind };
+      if (kind === "threat") return { word: pick(r, THREAT_WORDS).toUpperCase(), ink, kind };
+      if (kind === "positive") return { word: pick(r, POSITIVE_WORDS).toUpperCase(), ink, kind };
       return {
-        word: emotional ? pick(rng, NEUTRAL_WORDS).toUpperCase() : "▬▬▬▬",
+        word: emotional ? pick(r, NEUTRAL_WORDS).toUpperCase() : "▬▬▬▬",
         ink,
         kind: "neutral",
       };
@@ -69,8 +72,8 @@ export function StroopEngine({ config }: { config: Record<string, unknown> }) {
     for (let i = 0; i < nPractice; i++) {
       practice.push({ ...make(kinds[i % kinds.length]), phase: "practice" });
     }
-    return [...shuffle(rng, practice), ...shuffle(rng, body)];
-  }, [rng, emotional, nTrials, nPractice]);
+    return [...shuffle(r, practice), ...shuffle(r, body)];
+  }, [seed, emotional, nTrials, nPractice]);
 
   const [index, setIndex] = useState(0);
   const [showing, setShowing] = useState<"fixation" | "stimulus" | "feedback">("fixation");
@@ -110,7 +113,7 @@ export function StroopEngine({ config }: { config: Record<string, unknown> }) {
 
   const respond = useCallback(
     (colorName: string) => {
-      if (showing !== "stimulus" || !trial || doneRef.current) return;
+      if (showing !== "stimulus" || !trial || doneRef.current || pausedRef.current) return;
       const rt = now() - shownAtRef.current;
       const correct = colorName === trial.ink.name;
       record({
@@ -133,7 +136,7 @@ export function StroopEngine({ config }: { config: Record<string, unknown> }) {
         }
       });
     },
-    [showing, trial, now, record, after, index, trials.length, finish]
+    [showing, trial, now, pausedRef, record, after, index, trials.length, finish]
   );
 
   useEffect(() => {

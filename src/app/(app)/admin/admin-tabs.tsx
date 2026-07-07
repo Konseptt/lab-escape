@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import type { RoomContent, Difficulty } from "@/lib/content/types";
 import { DIFFICULTY_LABEL } from "@/lib/content/rooms";
@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useHydrated } from "@/components/use-hydrated";
 
 interface LeaderRow {
   id: string;
@@ -57,32 +58,35 @@ export function AdminTabs({
   dbLive: boolean;
 }) {
   const initial = rooms[0];
-  const initialOverride = loadRoomOverrides()[initial.slug];
 
   const [selected, setSelected] = useState(initial.slug);
   const room = rooms.find((r) => r.slug === selected)!;
 
-  const [title, setTitle] = useState(initialOverride?.title ?? initial.title);
-  const [summary, setSummary] = useState(initialOverride?.summary ?? initial.summary);
-  const [difficulty, setDifficulty] = useState(
-    (initialOverride?.difficulty as Difficulty | undefined) ?? initial.difficulty
-  );
-  const [configJson, setConfigJson] = useState(
-    JSON.stringify(initialOverride?.config ?? initial.config, null, 2)
-  );
+  // Form values are derived: unsaved draft edits sit on top of the stored
+  // override (readable only after hydration, so SSR markup and the first
+  // client render agree) on top of the room defaults. Switching rooms or
+  // reverting clears the draft.
+  const hydrated = useHydrated();
+  const [draft, setDraft] = useState<{
+    title?: string;
+    summary?: string;
+    difficulty?: Difficulty;
+    configJson?: string;
+  }>({});
+  const override = hydrated ? loadRoomOverrides()[selected] : undefined;
+  const title = draft.title ?? override?.title ?? room.title;
+  const summary = draft.summary ?? override?.summary ?? room.summary;
+  const difficulty =
+    draft.difficulty ??
+    (override?.difficulty as Difficulty | undefined) ??
+    room.difficulty;
+  const configJson =
+    draft.configJson ?? JSON.stringify(override?.config ?? room.config, null, 2);
 
-  const selectRoom = useCallback(
-    (slug: string) => {
-      const o = loadRoomOverrides()[slug];
-      const r = rooms.find((x) => x.slug === slug)!;
-      setSelected(slug);
-      setTitle(o?.title ?? r.title);
-      setSummary(o?.summary ?? r.summary);
-      setDifficulty((o?.difficulty as Difficulty | undefined) ?? r.difficulty);
-      setConfigJson(JSON.stringify(o?.config ?? r.config, null, 2));
-    },
-    [rooms]
-  );
+  const selectRoom = (slug: string) => {
+    setSelected(slug);
+    setDraft({});
+  };
 
   return (
     <Tabs defaultValue="builder">
@@ -146,7 +150,7 @@ export function AdminTabs({
                 <Input
                   id="b-title"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
                   className="mt-2"
                 />
               </div>
@@ -154,7 +158,9 @@ export function AdminTabs({
                 <Label htmlFor="b-difficulty">Difficulty</Label>
                 <Select
                   value={difficulty}
-                  onValueChange={(v) => setDifficulty(v as Difficulty)}
+                  onValueChange={(v) =>
+                    setDraft((d) => ({ ...d, difficulty: v as Difficulty }))
+                  }
                 >
                   <SelectTrigger id="b-difficulty" className="mt-2 w-full rounded-none border-border bg-surface">
                     <SelectValue />
@@ -174,7 +180,7 @@ export function AdminTabs({
               <Textarea
                 id="b-summary"
                 value={summary}
-                onChange={(e) => setSummary(e.target.value)}
+                onChange={(e) => setDraft((d) => ({ ...d, summary: e.target.value }))}
                 rows={2}
                 className="mt-2"
               />
@@ -189,7 +195,9 @@ export function AdminTabs({
               <Textarea
                 id="b-config"
                 value={configJson}
-                onChange={(e) => setConfigJson(e.target.value)}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, configJson: e.target.value }))
+                }
                 rows={8}
                 className="mt-2 font-mono text-xs"
                 spellCheck={false}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pause, Play, Lightbulb, Accessibility, X, Archive } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -25,13 +25,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
  */
 export function GameHud({ hint, roomCode }: { hint: string; roomCode: string }) {
   const router = useRouter();
-  const { objective, progress, phase, pause, resume, spendHint, hintsUsed, inventory } =
+  const { objective, progress, phase, pause, resume, spendHint, hintsUsed, inventory, reset } =
     useGameStore();
   const settings = useSettingsStore();
   const [hintOpen, setHintOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [a11yOpen, setA11yOpen] = useState(false);
   const [exitOpen, setExitOpen] = useState(false);
+  const hintSeenRef = useRef(false);
   const paused = phase === "paused";
 
   return (
@@ -81,7 +82,11 @@ export function GameHud({ hint, roomCode }: { hint: string; roomCode: string }) 
           <Tooltip>
             <TooltipTrigger
               onClick={() => {
-                spendHint();
+                // The hint text is static per room: charge it once per session.
+                if (!hintSeenRef.current) {
+                  hintSeenRef.current = true;
+                  spendHint();
+                }
                 setHintOpen(true);
               }}
               aria-label="Request a hint"
@@ -231,8 +236,8 @@ export function GameHud({ hint, roomCode }: { hint: string; roomCode: string }) 
           <DialogHeader>
             <DialogTitle className="text-base">Exit session?</DialogTitle>
             <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
-              This run will be recorded as abandoned. Completed trials are kept;
-              the room can be re-entered at any time.
+              This run will be discarded and its trials are not saved. The room
+              can be re-entered at any time for a fresh attempt.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
@@ -241,7 +246,10 @@ export function GameHud({ hint, roomCode }: { hint: string; roomCode: string }) 
             </Button>
             <Button
               variant="destructive"
-              onClick={() => router.push("/labs")}
+              onClick={() => {
+                reset();
+                router.push("/labs");
+              }}
             >
               Exit to Lab Map
             </Button>

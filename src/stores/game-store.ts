@@ -13,6 +13,7 @@ interface GameState {
   sessionId: string | null;
   seed: number;
   startedAtPerf: number;
+  pausedAtPerf: number;
   startedAtISO: string;
   trials: TrialRecord[];
   hintsUsed: number;
@@ -40,6 +41,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   sessionId: null,
   seed: 0,
   startedAtPerf: 0,
+  pausedAtPerf: 0,
   startedAtISO: "",
   trials: [],
   hintsUsed: 0,
@@ -90,8 +92,24 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   setObjective: (objective) => set({ objective }),
   setProgress: (progress) => set({ progress }),
-  pause: () => set((s) => (s.phase === "running" ? { phase: "paused" } : {})),
-  resume: () => set((s) => (s.phase === "paused" ? { phase: "running" } : {})),
+  pause: () =>
+    set((s) =>
+      s.phase === "running"
+        ? { phase: "paused", pausedAtPerf: performance.now() }
+        : {}
+    ),
+  resume: () =>
+    set((s) =>
+      s.phase === "paused"
+        ? {
+            phase: "running",
+            // Shift the session clock forward so paused time never leaks
+            // into reaction times, shownAt offsets, or durationMs.
+            startedAtPerf:
+              s.startedAtPerf + (performance.now() - s.pausedAtPerf),
+          }
+        : {}
+    ),
   spendHint: () => set((s) => ({ hintsUsed: s.hintsUsed + 1 })),
 
   complete: (highlights = []) => {
