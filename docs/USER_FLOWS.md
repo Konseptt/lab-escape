@@ -31,14 +31,14 @@ End-to-end paths through the platform for players, researchers, and administrato
 
 ## Researcher
 
-1. Sign in with a researcher or admin account (seed: `demo@labescape.app`).
+1. Sign in with a researcher or admin account (local demo: `demo@labescape.app` when `SEED_DEMO_ACCOUNTS=true`).
 2. **Research portal** `/research`, study overview, join codes, export requests.
 3. **Analytics** `/analytics`, cohort trends when DB has session data.
 4. **Export** via `/api/export`, JSON/CSV of trials (authenticated, consent-gated in production).
 
 ## Administrator
 
-1. Sign in as admin (seed: `admin@labescape.app` / `labescape-demo`).
+1. Sign in as admin (`admin@labescape.app` when demo seed is enabled locally). Promote your own account to `ADMIN` in production.
 2. **Admin console** `/admin`
    - **Telemetry**, DB status, participant count, sessions, trials.
    - **Experiment builder**, per-room title, summary, difficulty, engine JSON. Saves to `localStorage` overrides applied on next play session.

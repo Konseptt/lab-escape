@@ -67,16 +67,14 @@ npm run db:seed
 npm run dev
 ```
 
-**Demo accounts** (local only — set `SEED_DEMO_ACCOUNTS=true` before `npm run db:seed`):
+**Demo accounts** (local only — set `SEED_DEMO_ACCOUNTS=true` and `SEED_DEMO_PASSWORD` before `npm run db:seed`):
 
 | Email | Role |
 |-------|------|
 | `demo@labescape.app` | Player |
 | `admin@labescape.app` | Admin |
 
-Password: `labescape-demo`
-
-Never enable demo accounts in production. If they were seeded earlier, run `npm run db:revoke-demo` against your production `DATABASE_URL` to rotate passwords and demote the demo admin.
+Use the password from `SEED_DEMO_PASSWORD` (never commit it). Never enable demo accounts in production. If they were seeded earlier, run `npm run db:revoke-demo` against your production `DATABASE_URL` to rotate passwords and demote the demo admin.
 
 ---
 
@@ -89,6 +87,12 @@ Never enable demo accounts in production. If they were seeded earlier, run `npm 
 | `NEXT_PUBLIC_APP_URL` | Yes | e.g. `http://localhost:3000` |
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | No | Google OAuth |
 | `AUTH_GITHUB_ID` / `AUTH_GITHUB_SECRET` | No | GitHub OAuth |
+| `RESEND_API_KEY` | For reset email | Transactional email (Resend) |
+| `EMAIL_FROM` | No | Verified sender address |
+| `SEED_DEMO_ACCOUNTS` | No | `true` only for local demo seed |
+| `SEED_DEMO_PASSWORD` | With demo seed | Local-only password for demo accounts |
+
+See [`docs/SECURITY.md`](docs/SECURITY.md) for production hardening (WAF, secrets rotation).
 
 ---
 

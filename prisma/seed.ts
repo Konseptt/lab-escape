@@ -85,8 +85,14 @@ async function main() {
     });
   }
 
-  const passwordHash = await bcrypt.hash("labescape-demo", 10);
   if (process.env.SEED_DEMO_ACCOUNTS === "true") {
+    const demoPassword = process.env.SEED_DEMO_PASSWORD;
+    if (!demoPassword || demoPassword.length < 10) {
+      throw new Error(
+        "SEED_DEMO_PASSWORD must be set (min 10 chars) when SEED_DEMO_ACCOUNTS=true"
+      );
+    }
+    const passwordHash = await bcrypt.hash(demoPassword, 12);
     for (const user of [
       {
         email: "demo@labescape.app",

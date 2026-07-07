@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { Prisma } from "@/generated/client";
 import { db } from "@/lib/db";
-import { getViewer } from "@/lib/session";
 import { getRoom } from "@/lib/content/rooms";
+import { summarize } from "@/lib/game/scoring";
+import { getViewer } from "@/lib/session";
 
 const stimulusSchema = z
   .record(z.string(), z.unknown())
@@ -60,7 +61,23 @@ export async function POST(req: Request) {
     if (!room) return new NextResponse(null, { status: 204 });
 
     const startedAt = new Date(data.startedAtISO);
-    const xpGain = Math.min(500, Math.max(0, Math.round(data.score / 10)));
+    const stats = summarize(
+      data.trials.map((t) => ({
+        index: t.index,
+        phase: t.phase,
+        stimulus: t.stimulus,
+        expected: t.expected,
+        response: t.response,
+        correct: t.correct,
+        rtMs: t.rtMs,
+        shownAt: t.shownAt,
+      }))
+    );
+    const score = Math.round(Math.min(10_000, stats.score));
+    const accuracy = Math.min(1, Math.max(0, stats.accuracy));
+    const meanRtMs = Math.min(600_000, stats.meanRtMs);
+    const rtCvPct = Math.min(500, stats.rtCvPct);
+    const xpGain = Math.min(500, Math.max(0, Math.round(score / 10)));
     await db.$transaction(async (tx) => {
       await tx.gameSession.create({
         data: {
@@ -72,10 +89,10 @@ export async function POST(req: Request) {
           startedAt,
           completedAt: new Date(),
           durationMs: Math.round(data.durationMs),
-          score: Math.round(Math.min(10_000, data.score)),
-          accuracy: Math.min(1, Math.max(0, data.accuracy)),
-          meanRtMs: Math.min(600_000, data.meanRtMs),
-          rtCvPct: Math.min(500, data.rtCvPct),
+          score,
+          accuracy,
+          meanRtMs,
+          rtCvPct,
           hintsUsed: Math.min(50, data.hintsUsed),
           trials: {
             create: data.trials.map((t) => ({

@@ -5,7 +5,13 @@ import { OAuthButtons } from "@/components/auth/oauth-buttons";
 
 export const metadata: Metadata = { title: "Sign in" };
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
+
   return (
     <div>
       <p className="label-micro mb-3 text-faint">Access</p>
@@ -13,6 +19,14 @@ export default function LoginPage() {
       <p className="mt-2 text-sm text-muted-foreground">
         Sync sessions across devices. Guest mode keeps data local.
       </p>
+      {error === "rate-limit" ? (
+        <p
+          role="alert"
+          className="mt-4 border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+        >
+          Too many guest attempts. Wait a minute and try again.
+        </p>
+      ) : null}
       <div className="mt-8 space-y-6">
         <LoginForm />
         <OAuthButtons />

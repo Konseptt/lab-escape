@@ -2,10 +2,13 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 
-function securityHeaders(response: NextResponse) {
+function securityHeaders(response: NextResponse, pathname: string) {
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set(
+    "Referrer-Policy",
+    pathname.startsWith("/reset") ? "no-referrer" : "strict-origin-when-cross-origin"
+  );
   response.headers.set(
     "Permissions-Policy",
     "camera=(), microphone=(), geolocation=(), payment=()"
@@ -51,7 +54,7 @@ export function proxy(request: NextRequest) {
     }
   }
 
-  return securityHeaders(NextResponse.next());
+  return securityHeaders(NextResponse.next(), pathname);
 }
 
 export const config = {

@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { signIn, signOut } from "@/lib/auth";
 import { normalizeEmail } from "@/lib/auth-email";
 import { GUEST_COOKIE } from "@/lib/session";
+import { sendPasswordResetEmail } from "@/lib/email";
 import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 import { clientIp } from "@/lib/request-ip";
 
@@ -125,6 +126,11 @@ export async function login(
 }
 
 export async function continueAsGuest() {
+  const limited = await assertAuthRateLimit("guest", 20);
+  if (limited) redirect("/login?error=rate-limit");
+
+  await signOut({ redirect: false });
+
   const jar = await cookies();
   jar.set(GUEST_COOKIE, crypto.randomUUID(), {
     httpOnly: true,
@@ -175,10 +181,7 @@ export async function requestPasswordReset(
           expires: new Date(Date.now() + 1000 * 60 * 30),
         },
       });
-      if (process.env.NODE_ENV === "development") {
-        console.log(`[auth] reset link for ${email}: /reset?token=${token}`);
-      }
-      // TODO: send email via transactional provider in production.
+      await sendPasswordResetEmail(email, token);
     }
   } catch {
     // same response either way — do not reveal whether the email exists
