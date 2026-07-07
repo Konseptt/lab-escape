@@ -1,0 +1,17 @@
+{
+  "name": "Lab Escape",
+  "short_name": "Lab Escape",
+  "description": "Measured psychology rooms with trial-level logging.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#131312",
+  "theme_color": "#131312",
+  "icons": [
+    {
+      "src": "/logo-mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

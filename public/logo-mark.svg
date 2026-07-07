@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Lab Escape">
+  <rect width="64" height="64" fill="#131312"/>
+  <rect x="10" y="10" width="44" height="44" stroke="#e8e6e3" stroke-width="2"/>
+  <path d="M22 54V30h12M42 10v24H30M30 30v10" stroke="#e8e6e3" stroke-width="2"/>
+  <circle cx="32" cy="22" r="4" fill="#d97706"/>
+</svg>
