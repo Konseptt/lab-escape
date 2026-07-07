@@ -67,12 +67,16 @@ npm run db:seed
 npm run dev
 ```
 
-**Demo accounts** (password `labescape-demo`):
+**Demo accounts** (local only — set `SEED_DEMO_ACCOUNTS=true` before `npm run db:seed`):
 
 | Email | Role |
 |-------|------|
 | `demo@labescape.app` | Player |
 | `admin@labescape.app` | Admin |
+
+Password: `labescape-demo`
+
+Never enable demo accounts in production. If they were seeded earlier, run `npm run db:revoke-demo` against your production `DATABASE_URL` to rotate passwords and demote the demo admin.
 
 ---
 

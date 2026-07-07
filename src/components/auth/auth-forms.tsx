@@ -7,6 +7,7 @@ import {
   login,
   signup,
   requestPasswordReset,
+  resetPassword,
   type AuthActionState,
 } from "@/app/actions/auth-actions";
 import { Button } from "@/components/ui/button";
@@ -137,6 +138,45 @@ export function ForgotPasswordForm() {
         />
       </div>
       <SubmitButton pending={pending}>Send reset link</SubmitButton>
+    </form>
+  );
+}
+
+export function ResetPasswordForm({ token }: { token: string }) {
+  const [state, action, pending] = useActionState(resetPassword, initial);
+
+  if (state.ok) {
+    return (
+      <div role="status" className="border border-border bg-surface px-4 py-5 text-sm leading-relaxed text-muted-foreground">
+        Password updated. You can{" "}
+        <Link href="/login" className="text-foreground underline underline-offset-4 hover:text-primary">
+          sign in
+        </Link>{" "}
+        with your new password.
+      </div>
+    );
+  }
+
+  return (
+    <form action={action} className="space-y-4" noValidate>
+      <FieldError message={state.error} />
+      <input type="hidden" name="token" value={token} />
+      <div className="space-y-1.5">
+        <Label htmlFor="password">New password</Label>
+        <Input
+          id="password"
+          name="password"
+          type="password"
+          autoComplete="new-password"
+          required
+          minLength={10}
+          aria-describedby="reset-password-hint"
+        />
+        <p id="reset-password-hint" className="text-[11px] text-faint">
+          At least 10 characters.
+        </p>
+      </div>
+      <SubmitButton pending={pending}>Update password</SubmitButton>
     </form>
   );
 }

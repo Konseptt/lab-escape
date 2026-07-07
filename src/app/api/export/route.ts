@@ -17,9 +17,9 @@ function csvEscape(v: unknown): string {
 /**
  * Research export: trial-level data for the requesting user's sessions
  * (or all sessions for ADMIN/RESEARCHER). `?format=json|csv`.
- * Staff bulk exports are anonymized by default; pass `?identified=1` to include emails.
+ * Staff bulk exports are anonymized by default.
+ * `?identified=1` is ADMIN-only and includes only participants with active consent.
  * Personal exports include identity unless `?anonymize=1`.
- * `shown_at_ms` is the trial onset as milliseconds since session start.
  */
 export async function GET(req: Request) {
   const viewer = await getViewer();
@@ -31,15 +31,34 @@ export async function GET(req: Request) {
   }
   const url = new URL(req.url);
   const format = url.searchParams.get("format") === "csv" ? "csv" : "json";
-  const isStaff = viewer.role === "ADMIN" || viewer.role === "RESEARCHER";
+  const isAdmin = viewer.role === "ADMIN";
+  const isStaff = isAdmin || viewer.role === "RESEARCHER";
   const identified = url.searchParams.get("identified") === "1";
+
+  if (identified && !isAdmin) {
+    return NextResponse.json(
+      { error: "Identified export requires an administrator account." },
+      { status: 403 }
+    );
+  }
+
   const anonymize = isStaff
     ? !identified
     : url.searchParams.get("anonymize") === "1";
 
+  const where = isStaff
+    ? identified
+      ? {
+          user: {
+            consents: { some: { revokedAt: null } },
+          },
+        }
+      : {}
+    : { userId: viewer.id };
+
   try {
     const sessions = await db.gameSession.findMany({
-      where: isStaff ? {} : { userId: viewer.id },
+      where,
       include: {
         trials: { orderBy: { index: "asc" } },
         room: { select: { slug: true } },

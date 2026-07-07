@@ -341,8 +341,8 @@ export function AdminTabs({
             </Button>
           </div>
           <p className="font-mono text-[11px] leading-relaxed text-faint">
-            Identified exports require RESEARCHER or ADMIN role and an active
-            consent record for each included participant.
+            Identified exports require ADMIN role and active participant consent records.
+            Researchers receive anonymized bulk exports by default.
           </p>
         </div>
       </TabsContent>

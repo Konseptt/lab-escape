@@ -5,6 +5,7 @@ import GitHub from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
+import { normalizeEmail } from "@/lib/auth-email";
 
 declare module "next-auth" {
   interface Session {
@@ -39,7 +40,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        const email = credentials?.email as string | undefined;
+        const email = normalizeEmail(String(credentials?.email ?? ""));
         const password = credentials?.password as string | undefined;
         if (!email || !password) return null;
 
@@ -68,6 +69,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
   callbacks: {
+    async signIn({ user, account }) {
+      if (account?.provider === "credentials") return true;
+      if (!user.email) return false;
+      return true;
+    },
     async jwt({ token, user }) {
       if (user?.id) {
         token.sub = user.id;

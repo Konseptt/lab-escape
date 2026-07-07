@@ -12,7 +12,16 @@ export interface Viewer {
 }
 
 export async function getViewer(): Promise<Viewer | null> {
-  const session = await auth().catch(() => null);
+  let session;
+  try {
+    session = await auth();
+  } catch (err) {
+    if (process.env.NODE_ENV !== "production") {
+      console.error("[auth] session lookup failed:", err);
+    }
+    return null;
+  }
+
   if (session?.user?.id) {
     return {
       id: session.user.id,

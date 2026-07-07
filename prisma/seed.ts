@@ -86,37 +86,42 @@ async function main() {
   }
 
   const passwordHash = await bcrypt.hash("labescape-demo", 10);
-  for (const user of [
-    {
-      email: "demo@labescape.app",
-      name: "Demo Participant",
-      role: "PLAYER" as const,
-      xp: 480,
-      level: 3,
-    },
-    {
-      email: "admin@labescape.app",
-      name: "Facility Admin",
-      role: "ADMIN" as const,
-      xp: 0,
-      level: 1,
-    },
-  ]) {
-    await db.user.upsert({
-      where: { email: user.email },
-      update: { passwordHash },
-      create: {
-        email: user.email,
-        name: user.name,
-        passwordHash,
-        emailVerified: new Date(),
-        role: user.role,
-        institutionId: institution.id,
-        xp: user.xp,
-        level: user.level,
-        settings: { create: {} },
+  if (process.env.SEED_DEMO_ACCOUNTS === "true") {
+    for (const user of [
+      {
+        email: "demo@labescape.app",
+        name: "Demo Participant",
+        role: "PLAYER" as const,
+        xp: 480,
+        level: 3,
       },
-    });
+      {
+        email: "admin@labescape.app",
+        name: "Facility Admin",
+        role: "ADMIN" as const,
+        xp: 0,
+        level: 1,
+      },
+    ]) {
+      await db.user.upsert({
+        where: { email: user.email },
+        update: { passwordHash },
+        create: {
+          email: user.email,
+          name: user.name,
+          passwordHash,
+          emailVerified: new Date(),
+          role: user.role,
+          institutionId: institution.id,
+          xp: user.xp,
+          level: user.level,
+          settings: { create: {} },
+        },
+      });
+    }
+    console.log("Demo accounts created (SEED_DEMO_ACCOUNTS=true).");
+  } else {
+    console.log("Skipped demo accounts (set SEED_DEMO_ACCOUNTS=true for local demos).");
   }
 
   console.log("Seed complete.");
