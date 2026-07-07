@@ -11,6 +11,18 @@ import type { SessionResult } from "./types";
 const KEY = "lab-escape:sessions";
 const MAX = 200;
 
+const listeners = new Set<() => void>();
+
+/** Notify subscribers that local session history changed (same-tab). */
+export function notifySessionsChanged() {
+  listeners.forEach((l) => l());
+}
+
+export function subscribeSessions(listener: () => void) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
 export function loadSessions(): SessionResult[] {
   if (typeof window === "undefined") return [];
   try {
@@ -39,6 +51,8 @@ export function saveSession(result: SessionResult) {
       /* give up silently; the API mirror may still succeed */
     }
   }
+
+  notifySessionsChanged();
 
   void fetch("/api/sessions", {
     method: "POST",

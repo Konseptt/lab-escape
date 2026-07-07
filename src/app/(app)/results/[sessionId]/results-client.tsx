@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion, animate } from "framer-motion";
 import { ArrowRight, BookOpen, RotateCcw } from "lucide-react";
 import { useHistory } from "@/components/use-history";
+import { loadSession } from "@/lib/game/history";
 import { getRoom } from "@/lib/content/rooms";
 import { learningCurve } from "@/lib/game/scoring";
 import { SubjectPathway } from "@/components/subject-pathway";
@@ -39,7 +40,7 @@ function AnimatedNumber({ value, decimals = 0 }: { value: number; decimals?: num
 export function ResultsClient({ sessionId }: { sessionId: string }) {
   const sessions = useHistory();
   const nextAction = useNextAction();
-  const session = sessions.find((s) => s.id === sessionId);
+  const session = sessions.find((s) => s.id === sessionId) ?? loadSession(sessionId);
   const room = session ? getRoom(session.roomSlug) : null;
 
   const curve = useMemo(

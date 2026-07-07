@@ -1,21 +1,24 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { loadSessions } from "@/lib/game/history";
+import { loadSessions, subscribeSessions, notifySessionsChanged } from "@/lib/game/history";
 import type { SessionResult } from "@/lib/game/types";
 
 let cache: SessionResult[] | null = null;
-const listeners = new Set<() => void>();
 
 function subscribe(cb: () => void) {
-  listeners.add(cb);
+  const onLocalChange = () => {
+    cache = null;
+    cb();
+  };
+  const unsubLocal = subscribeSessions(onLocalChange);
   const onStorage = () => {
     cache = null;
-    listeners.forEach((l) => l());
+    cb();
   };
   window.addEventListener("storage", onStorage);
   return () => {
-    listeners.delete(cb);
+    unsubLocal();
     window.removeEventListener("storage", onStorage);
   };
 }
@@ -40,5 +43,5 @@ export function useHistory(): SessionResult[] {
 
 export function invalidateHistory() {
   cache = null;
-  listeners.forEach((l) => l());
+  notifySessionsChanged();
 }
